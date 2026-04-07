@@ -102,23 +102,31 @@ func NewPIAClient(username, password, region string, verbose bool) (*PIAClient, 
 
 // GetToken
 func (p *PIAClient) GetToken() (string, error) {
-	server := p.getMetadataServerForRegion()
-	url := fmt.Sprintf("https://%v/authv3/generateToken", server.Cn)
+	url := "https://privateinternetaccess.com/gtoken/generateToken"
 
-	// Send request
-	resp, err := p.executePIARequest(server, url, "")
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return "", err
+	}
+	req.SetBasicAuth(p.username, p.password)
+
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return "", errors.Wrap(err, "error executing request")
 	}
 
-	// Parse response
 	var tokenResp struct {
-		Token string `json:"token"`
+		Status string `json:"status"`
+		Token  string `json:"token"`
 	}
 
 	err = json.NewDecoder(resp.Body).Decode(&tokenResp)
 	if err != nil {
 		return "", errors.Wrap(err, "error decoding token response")
+	}
+
+	if tokenResp.Status != "OK" {
+		return "", fmt.Errorf("token request failed with status: %s", tokenResp.Status)
 	}
 
 	if p.verbose {
